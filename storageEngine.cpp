@@ -94,6 +94,20 @@ void insertChildren(BTreeNode* node, LinkedListNode<BTreeNode*>* children) {
         return;
     } 
 
+    if (current->data->keys->data > val) {
+        LinkedListNode<BTreeNode*>* temp = node->children;
+        node->children = children;
+
+        LinkedListNode<BTreeNode*>* c = children;
+
+        while (c->next != NULL) {
+            c = c->next;
+        }
+
+        c->next = temp;
+        return;
+    }
+
     while (current->next != NULL) {
         if ((current->data->keys->data < val) && (current->next->data->keys->data > val)) {
             LinkedListNode<BTreeNode*>* temp = current->next;
@@ -281,13 +295,17 @@ BTreeNode* insert(BTreeNode* node, int val) {
                 // node that is being split needs to be removed from parents children
                 BTreeNode* parent = prev;
                 LinkedListNode<BTreeNode*>* child = parent->children;
-                
-                while (child->next != NULL) {
-                    if (child->next->data == c) {
-                        child->next = child->next->next;
-                        break;
+
+                if (child->data == c) {
+                    parent->children = parent->children->next;
+                } else {
+                    while (child->next != NULL) {
+                        if (child->next->data == c) {
+                            child->next = child->next->next;
+                            break;
+                        }
+                        child = child->next;
                     }
-                    child = child->next;
                 }
 
                 prev->countChildren -= 1;
@@ -387,7 +405,7 @@ void printKeys(BTreeNode* node) {
 int main() {
     BTreeNode* root = new BTreeNode;
     root->keys = new LinkedListNode<int>;
-    root->keys->data = 2;
+    root->keys->data = 7;
     root->keys->next = NULL;
     root->children = NULL;
     root->countChildren = 0;
