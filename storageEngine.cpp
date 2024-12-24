@@ -207,34 +207,11 @@ BTreeNode* splitNode(BTreeNode* node) {
         current = current->next;
     }
 
-    // if (!node->isLeaf) {
-    //     i = 0;
-    //     LinkedListNode<BTreeNode*>* childrenLC;
-    //     LinkedListNode<BTreeNode*>* childrenRC;
-    //     LinkedListNode<BTreeNode*>* current = node->children;
-    //     childrenLC = node->children;
-
-    //     while (i < median) {
-    //         current = current->next;
-    //         i++;
-    //     }
-        
-    //     childrenRC = current->next;
-    //     current->next = NULL;
-    //     lc->children = childrenLC;
-    //     lc->countChildren = i;
-    //     lc->countKeys = i-1;
-    //     rc->children = childrenRC;
-    //     rc->countChildren = (node->countChildren)-i;
-    //     rc->countKeys = (node->countChildren)-i+1;
-    // }
-
     LinkedListNode<BTreeNode*>* rootChildren = new LinkedListNode<BTreeNode*>;
     rootChildren->data = lc;
     rootChildren->next = new LinkedListNode<BTreeNode*>;
     rootChildren->next->data = rc;
     rootChildren->next->next = NULL;
-    //rc->isLeaf = lc->isLeaf = 1; 
     root->children = rootChildren;    
 
     root->countChildren = 2;
@@ -475,31 +452,7 @@ int main() {
     root = insert(root, 10);
     printTree(root);
     cout << endl;
-    // cout << "root: ";
-    // printKeys(root);
-    // cout << endl;
 
-    // cout << "children: ";
-    // printChildren(root);
-    // cout << endl;
-
-    // cout << "root right: ";
-    // printKeys(root->children->next->data);
-    // cout << endl;
-
-    // cout << "root right isLeaf: ";
-    // cout << (root->children->next->data->isLeaf);
-    // cout << endl;
-
-    
-    // insertSorted(root, 1);
-    // insertSorted(root, 3);
-    // insertSorted(root, 4);
-    // insertSorted(root, 5);
-
-    //root = splitNode(root);
-
-    //printTree(root);
 
     return 0;
 }
