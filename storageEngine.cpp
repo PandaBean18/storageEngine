@@ -43,6 +43,107 @@ LinkedListNode<t>* findNodeAtIndex(LinkedListNode<t>* root, int index) {
     return current;
 }
 
+void insertKey(BTreeNode* node, int val) {
+    LinkedListNode<int>* newVal = new LinkedListNode<int>;
+    newVal->data = val;
+    newVal->next = NULL;
+
+    if ((node->keys == NULL) || (node->keys->data >= val)) {
+
+        LinkedListNode<int>* temp = node->keys;
+        node->keys = newVal;
+        newVal->next = temp;
+        node->countKeys++;
+        return;
+    }
+
+    LinkedListNode<int>* current = node->keys;
+
+    while (current->next != NULL) {
+        if ((current->data < val) && (current->next->data > val)) {
+            LinkedListNode<int>* temp = current->next;
+            current->next = newVal;
+            newVal->next = temp;
+            node->countKeys++;
+            return;
+        }
+        current = current->next;
+    }
+
+    current->next = newVal;
+    newVal->next = NULL;
+    node->countKeys++;
+    return;
+}
+
+void insertChildren(BTreeNode* node, LinkedListNode<BTreeNode*>* children) {
+    // since this function will be called after splitting node we can 
+    // assume that the two children passed in arguments will always
+    // be placed adjacent to each other
+
+    node->isLeaf = 0;
+    if (children == NULL) {
+        return;
+    }
+
+    LinkedListNode<BTreeNode*>* current = node->children;
+    int val = children->data->keys->data;
+
+    if (current == NULL) {
+        node->children = children;
+        return;
+    } 
+
+    while (current->next != NULL) {
+        if ((current->data->keys->data < val) && (current->next->data->keys->data > val)) {
+            LinkedListNode<BTreeNode*>* temp = current->next;
+            current->next = children;
+            LinkedListNode<BTreeNode*>* c = children;
+            int i = 0;
+            while (c->next != NULL) {
+                c = c->next;
+                i++;
+            }
+            c->next = temp;
+            node->countChildren += i;
+            return;
+        }
+        current = current->next;
+        
+    }
+
+    current->next = children;
+    node->countChildren = node->countKeys + 1;
+    return;
+}
+
+void removeNullChildren(LinkedListNode<BTreeNode*>* child) {
+    LinkedListNode<BTreeNode*>* current = child;
+    if (current == NULL) {
+        return;
+    }
+
+    while (current->data == NULL) {
+        current = current->next;
+        if (current == NULL) {
+            return;
+        }
+    }
+    
+    while (current->next != NULL) {
+        if (current->next->data == NULL) {
+            current->next = current->next->next;
+        }
+
+        current = current->next;
+
+        if (current == NULL) {
+            break;
+        }
+    }
+    return;
+}
+
 // The function takes a node and a value as parameters and inserts the
 // value into the node in a sorted manner. It does not split incase
 // the root is filled.
@@ -80,6 +181,7 @@ void insertSorted(BTreeNode* node, BTreeNode* val) {
             current->next = newVal;
             newVal->next = temp;
             inserted = 1;
+            break;
         }
         current = current->next;
         i++;
@@ -92,9 +194,16 @@ void insertSorted(BTreeNode* node, BTreeNode* val) {
     node->countKeys++;
 
     if (val->countChildren != 0) {
-        i = i-1;
         LinkedListNode<BTreeNode*>* l = findNodeAtIndex(node->children, i-1);
+        LinkedListNode<BTreeNode*>* l2 = l->next;
         l->next = val->children;
+
+        while (l->next != NULL) {
+            l = l->next;
+        }
+
+        l->next = l2;
+        node->countChildren += 2;
     }
 }
 
@@ -111,6 +220,7 @@ BTreeNode* splitNode(BTreeNode* node) {
     int i = 0;
 
     lc->order = rc->order = root->order = node->order;
+    lc->isLeaf = rc->isLeaf = 1;
     root->isLeaf = 0;
 
     while(current) {
@@ -131,14 +241,14 @@ BTreeNode* splitNode(BTreeNode* node) {
             LinkedListNode<BTreeNode*>* rightChildOfCurrent = leftChildOfCurrent->next;
             
             if (rightChildOfCurrent == NULL) {
-                throw EndOfNodeError();
+                rightChildOfCurrent = new LinkedListNode<BTreeNode*>;
+                rightChildOfCurrent->data = NULL;
             }
 
             newNode->children->data = leftChildOfCurrent->data;
             newNode->children->next = new LinkedListNode<BTreeNode*>;
             newNode->children->next->data = rightChildOfCurrent->data;
             newNode->children->next->next = NULL;
-
         }
 
         if (i == median) {
@@ -148,11 +258,13 @@ BTreeNode* splitNode(BTreeNode* node) {
             newNode->children->next = new LinkedListNode<BTreeNode*>;
             newNode->children->next->data = rc;
             newNode->children->next->next = NULL;
-            insertSorted(root, newNode);
+            insertKey(root, current->data);
         } else if (i < median) {
-            insertSorted(lc, newNode);
+            insertKey(lc, current->data);
+            insertChildren(lc, newNode->children);
         } else if (i > median) {
-            insertSorted(rc, newNode);
+            insertKey(rc, current->data);
+            insertChildren(rc, newNode->children);
         }
         i++;
         current = current->next;
@@ -180,15 +292,16 @@ BTreeNode* splitNode(BTreeNode* node) {
     //     rc->countKeys = (node->countChildren)-i+1;
     // }
 
-    // LinkedListNode<BTreeNode*>* rootChildren = new LinkedListNode<BTreeNode*>;
-    // rootChildren->data = lc;
-    // rootChildren->next = new LinkedListNode<BTreeNode*>;
-    // rootChildren->next->data = rc;
-    // rootChildren->next->next = NULL;
-    // rc->isLeaf = lc->isLeaf = 1; 
-    // root->children = rootChildren;    
-    // root->countChildren = 2;
-    // root->countKeys = 1;
+    LinkedListNode<BTreeNode*>* rootChildren = new LinkedListNode<BTreeNode*>;
+    rootChildren->data = lc;
+    rootChildren->next = new LinkedListNode<BTreeNode*>;
+    rootChildren->next->data = rc;
+    rootChildren->next->next = NULL;
+    //rc->isLeaf = lc->isLeaf = 1; 
+    root->children = rootChildren;    
+
+    root->countChildren = 2;
+    root->countKeys = 1;
     return root;
 }
 
@@ -203,14 +316,114 @@ BTreeNode* insert(BTreeNode* node, int val) {
     newNode->keys->next = NULL;
     newNode->countKeys = 1;
 
-    insertSorted(node, newNode);
-    BTreeNode* root = node;
+    // first we find the node in which we insert val;
 
-    if (node->countKeys >= node->order) {
-        root = splitNode(node);
-    }
+    if (node->isLeaf) {
+        insertKey(node, val);
+        BTreeNode* root = node;
 
-    return root;
+        if (node->countKeys >= node->order) {
+            root = splitNode(node);
+            root->isLeaf = 0;
+            LinkedListNode<BTreeNode*>* c = root->children;
+
+            while (c) {
+                c->data->isLeaf = 1;
+                c = c->next;
+            }
+        }
+
+        return root;
+    } else {
+        BTreeNode* current = node;
+        LinkedListNode<BTreeNode*>* path = new LinkedListNode<BTreeNode*>;
+        path->data = current;
+        path->next = NULL;
+        int i = 0;
+        while (!current->isLeaf) {
+            i = 0;
+
+            while (i < current->countKeys) {
+                LinkedListNode<int>* currentVal = findNodeAtIndex(current->keys, i);
+                
+                if ((i == current->countKeys-1) && (val > currentVal->data)) {
+                    current = (findNodeAtIndex(current->children, i+1))->data;
+                    i++;
+                    break;
+                }
+
+                if (val < currentVal->data) {
+                    current = (findNodeAtIndex(current->children, i))->data;
+                    i++;
+                    break;
+                }
+                i++;
+            }
+            LinkedListNode<BTreeNode*>* temp = path;
+            path = new LinkedListNode<BTreeNode*>;
+            path->data = current;
+            path->next = temp;
+        }
+        i--;
+        insertKey(path->data, val);
+        path->data->isLeaf = 1;
+        BTreeNode* c = path->data;
+        BTreeNode* prev = path->next->data;
+        path = path->next->next;
+        int cont = (current->countKeys >= current->order);
+        int isFirstIter = 1;
+
+        while (cont) {
+            BTreeNode* currentRoot = splitNode(c);
+            currentRoot->isLeaf = 0;
+
+            if (isFirstIter) {
+                isFirstIter = 0;
+                LinkedListNode<BTreeNode*>* child = currentRoot->children;
+
+                while (child) {
+                    child->data->isLeaf = 1;
+                    child = child->next;
+                }
+            }
+
+            if (prev == NULL) {
+                return currentRoot;
+            } else {
+
+                // node that is being split needs to be removed from parents children
+                BTreeNode* parent = prev;
+                LinkedListNode<BTreeNode*>* child = parent->children;
+                
+                while (child->next != NULL) {
+                    if (child->next->data == c) {
+                        child->next = child->next->next;
+                        break;
+                    }
+                    child = child->next;
+                }
+
+                prev->countChildren -= 1;
+                insertKey(prev, currentRoot->keys->data);
+                removeNullChildren(prev->children);
+                insertChildren(prev, currentRoot->children);
+                prev->isLeaf = 0;
+                c = prev;
+                if (path == NULL) {
+                    prev = NULL;
+                } else {
+                    prev = path->data;
+                    path = path->next;
+                }
+            }
+            
+            
+            cont = (c->countKeys >= c->order);
+        }
+        
+        return node;
+
+    }    
 }
 
 void printTree(BTreeNode* root) {
@@ -232,14 +445,20 @@ void printTree(BTreeNode* root) {
             }
 
             LinkedListNode<BTreeNode*>* children = toBeTraversed->data->children;
-            last->next = children;
+            
             if (children != NULL) {
-
-                while (children->next != NULL) {
+                LinkedListNode<BTreeNode*>* currentChild = children;
+                while (children != NULL && children->data != NULL) {
+                    //cout << children->data << endl;
+                    last->next = new LinkedListNode<BTreeNode*>;
+                    last->next->data = children->data;
+                    last = last->next;
                     children = children->next;
                 }
 
-                last = children;
+                last->next = new LinkedListNode<BTreeNode*>;
+                last->next->data = nullptr;
+                last = last->next;
             }
         }
         toBeTraversed = toBeTraversed->next;
@@ -254,6 +473,31 @@ void printTree(BTreeNode* root) {
     }
 }
 
+void printChildren(BTreeNode* node) {
+    LinkedListNode<BTreeNode*>* current = node->children;
+
+    while (current != NULL) {
+        LinkedListNode<int>* c = current->data->keys;
+
+        while (c != NULL) {
+            cout << c->data << " ";
+            c = c->next;
+        }
+        cout << "   ";
+        current = current->next;
+    }
+}
+
+void printKeys(BTreeNode* node) {
+    LinkedListNode<int>* current = node->keys;
+
+    while (current != NULL) {
+        cout << current->data;
+        current = current->next;
+    }
+    cout << endl;
+}
+
 int main() {
     BTreeNode* root = new BTreeNode;
     root->keys = new LinkedListNode<int>;
@@ -263,12 +507,53 @@ int main() {
     root->countChildren = 0;
     root->countKeys = 1;
     root->isLeaf = 1;
-    root->order = 5;
+    root->order = 3;
+    int a;
+    while (1) {
+        cout<< endl << "> ";
+        cin >> a;
+
+        if (a == -1) {
+            break;
+        }
+
+        root = insert(root, a);
+        printTree(root);
+        cout << endl;
+        cout << "Number of children of root: " << root->countChildren << endl;
+    }
+
+    return 0;
+
+
+    root = insert(root, 0);
     root = insert(root, 1);
     root = insert(root, 3);
     root = insert(root, 4);
     root = insert(root, 5);
     root = insert(root, 6);
+    root = insert(root, 7);
+    root = insert(root, 8);
+    root = insert(root, 9);
+    root = insert(root, 10);
+    printTree(root);
+    cout << endl;
+    // cout << "root: ";
+    // printKeys(root);
+    // cout << endl;
+
+    // cout << "children: ";
+    // printChildren(root);
+    // cout << endl;
+
+    // cout << "root right: ";
+    // printKeys(root->children->next->data);
+    // cout << endl;
+
+    // cout << "root right isLeaf: ";
+    // cout << (root->children->next->data->isLeaf);
+    // cout << endl;
+
     
     // insertSorted(root, 1);
     // insertSorted(root, 3);
@@ -277,7 +562,7 @@ int main() {
 
     //root = splitNode(root);
 
-    printTree(root);
+    //printTree(root);
 
     return 0;
 }
