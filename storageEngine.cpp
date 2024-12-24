@@ -117,33 +117,6 @@ void insertChildren(BTreeNode* node, LinkedListNode<BTreeNode*>* children) {
     return;
 }
 
-void removeNullChildren(LinkedListNode<BTreeNode*>* child) {
-    LinkedListNode<BTreeNode*>* current = child;
-    if (current == NULL) {
-        return;
-    }
-
-    while (current->data == NULL) {
-        current = current->next;
-        if (current == NULL) {
-            return;
-        }
-    }
-    
-    while (current->next != NULL) {
-        if (current->next->data == NULL) {
-            current->next = current->next->next;
-        }
-
-        current = current->next;
-
-        if (current == NULL) {
-            break;
-        }
-    }
-    return;
-}
-
 /// @brief Takes a node with `m` children and splits the node on the
 /// median element, returns this new element as root.
 /// @param node 
@@ -319,7 +292,6 @@ BTreeNode* insert(BTreeNode* node, int val) {
 
                 prev->countChildren -= 1;
                 insertKey(prev, currentRoot->keys->data);
-                removeNullChildren(prev->children);
                 insertChildren(prev, currentRoot->children);
                 prev->isLeaf = 0;
                 c = prev;
