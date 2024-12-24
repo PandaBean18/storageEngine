@@ -144,69 +144,6 @@ void removeNullChildren(LinkedListNode<BTreeNode*>* child) {
     return;
 }
 
-// The function takes a node and a value as parameters and inserts the
-// value into the node in a sorted manner. It does not split incase
-// the root is filled.
-void insertSorted(BTreeNode* node, BTreeNode* val) {
-    //todo: update function to take input of val as BTreeNode of one key
-    // this way if the value to be inserted is new val being inserted at
-    // root, we can add it directly but also if it is a value coming from
-    // splitNode
-    LinkedListNode<int>* newVal = new LinkedListNode<int>;
-    newVal->data = val->keys->data;
-    newVal->next = NULL;
-
-
-    if (!(node->keys)) {
-        node->keys = val->keys;
-        node->countKeys = 1;
-        node->children = val->children;
-        node->countChildren = val->countChildren;
-        return;
-    }
-
-    LinkedListNode<int>* current = node->keys;
-    int inserted = 0;
-    int i = 0;
-
-    if (newVal->data < current->data) {
-        newVal->next = current;
-        node->keys = newVal;
-        inserted = 1;
-    }
-
-    while ((current->next != NULL) && !inserted) {
-        if (current->next->data > newVal->data) {
-            LinkedListNode<int>* temp = current->next;
-            current->next = newVal;
-            newVal->next = temp;
-            inserted = 1;
-            break;
-        }
-        current = current->next;
-        i++;
-    }
-
-    if (!inserted) {
-        current->next = newVal;
-    }
-
-    node->countKeys++;
-
-    if (val->countChildren != 0) {
-        LinkedListNode<BTreeNode*>* l = findNodeAtIndex(node->children, i-1);
-        LinkedListNode<BTreeNode*>* l2 = l->next;
-        l->next = val->children;
-
-        while (l->next != NULL) {
-            l = l->next;
-        }
-
-        l->next = l2;
-        node->countChildren += 2;
-    }
-}
-
 /// @brief Takes a node with `m` children and splits the node on the
 /// median element, returns this new element as root.
 /// @param node 
@@ -420,7 +357,7 @@ BTreeNode* insert(BTreeNode* node, int val) {
             
             cont = (c->countKeys >= c->order);
         }
-        
+
         return node;
 
     }    
