@@ -1,6 +1,7 @@
 #include "btree.cpp"
 #include "stack"
 #include <cstring>
+#include <string>
 
 // Defination of keywords;
 
@@ -54,8 +55,8 @@ struct Keyword {
 
 struct CreateTableRequest {
     char* tableName;
-    char* columnNames;
-    char* dataTypes;
+    LinkedListNode<char*>* columnNames;
+    LinkedListNode<char*>* dataTypes;
     char* primaryIndexColumn;
 };
 
@@ -171,8 +172,69 @@ char* parseAttribute(char* string, Keyword* keyword) {
     return string;
 }
 
-CreateTableRequest* convertCreateStringToRequest(char* string) {
+CreateTableRequest* convertCreateStringToRequest(LinkedListNode<Keyword*>* keywords) {
+    CreateTableRequest* createTableReq = new CreateTableRequest;
+    LinkedListNode<char*>* cols = createTableReq->columnNames = NULL;
+    LinkedListNode<char*>* colDataTypes = createTableReq->dataTypes = NULL;
+    int countCols = 0, countDataTypes = 0;
 
+    if (keywords->data->type != CREATE) {
+        throw QueryParseError();
+    }
+
+    while (keywords) {
+        if (keywords->data->type == TABLE_NAME) {
+            createTableReq->tableName = keywords->data->val;
+        } else if (keywords->data->type == ATTRIBUTE_NAME) {
+            LinkedListNode<char*>* t = new LinkedListNode<char*>;
+
+            t->data = keywords->data->val;
+            t->next = NULL;
+
+            if (t->data == NULL) {
+                throw SyntaxError();
+            }
+
+            if (createTableReq->columnNames == NULL) {
+                createTableReq->columnNames = t;
+                cols = t;
+                countCols++;
+            } else {
+                cols->next = t;
+                cols = t;
+                countCols++;
+            }
+
+            LinkedListNode<char*>* t1 = new LinkedListNode<char*>; // reusing the  variable as they are both linkedLists of character data
+            t1->data = keywords->data->datatype;
+            t1->next = NULL;
+
+            if (t1->data == NULL) {
+                throw SyntaxError();
+            }
+
+            if (createTableReq->dataTypes == NULL) {
+                createTableReq->dataTypes = t1;
+                colDataTypes = t1;
+                countDataTypes++;
+            } else {
+                colDataTypes->next = t1;
+                colDataTypes = t1;
+                countDataTypes++;
+            }
+
+            if (keywords->data->isPrimary) {
+                createTableReq->primaryIndexColumn = keywords->data->val;
+            }
+        }
+        keywords = keywords->next;
+    }
+
+    if (countCols != countDataTypes) {
+        throw SyntaxError();
+    }
+
+    return createTableReq;
 }
 
 LinkedListNode<Keyword*>* convertStringToKeywords(char* string) {
@@ -323,49 +385,36 @@ Table* createTable(char* query) {
 }
 
 int main() {
-    // BTreeNode* root = new BTreeNode;
-    // root->keys = new LinkedListNode<int>;
-    // root->keys->data = 2;
-    // root->keys->next = NULL;
-    // root->children = NULL;
-    // root->countChildren = 0;
-    // root->countKeys = 1;
-    // root->isLeaf = 1;
-    // root->order = 4;
-    // int a;
-    // while (1) {
-    //     cout<< endl << "> ";
-    //     cin >> a;
+    char* inp = NULL;
+    int count = 0;
+    cout << "qbd> ";
+    string a;
+    getline(cin, a);
+    
+    for (string::iterator it = a.begin(); it != a.end(); it++) {
+        inp = (char*)realloc(inp, count+1);
+        inp[count] = *it;
 
-    //     if (a == -1) {
-    //         break;
-    //     }
-
-    //     root = insert(root, a);
-    //     printTree(root);
-    //     cout << endl;
-    //     cout << "Number of children of root: " << root->countChildren << endl;
-    // }
-
-    LinkedListNode<Keyword*>* keywords = convertStringToKeywords("CREATE TABLE users (userID INT PRIMARY_KEY, userName CHAR)\0");
-    int countKeywords = 0;
-
-    cout << "Input: " << "CREATE TABLE users (userID INT PRIMARY_KEY, userName CHAR)\0" << endl;
-    while (keywords) {
-        cout << endl << keywords->data->type;
-        if (keywords->data->type == STR_LITERAL || keywords->data->type == ATTRIBUTE_NAME || keywords->data->type == TABLE_NAME) {
-            cout << "\nValue: " << keywords->data->val << endl;
-
-            if (keywords->data->type == ATTRIBUTE_NAME) {
-                cout << "Datatype: " << keywords->data->datatype << endl;
-                cout << "Is Primary: " << keywords->data->isPrimary << endl; 
-            }
-
-            cout << endl << endl;
-        }
-        keywords = keywords->next;
-        countKeywords++;
+        count++;
     }
-    cout << "Total Keywords: " << countKeywords << endl;
+
+    inp = (char*)realloc(inp, count+1);
+    inp[count] = '\0';
+
+    LinkedListNode<Keyword*>* keywords = convertStringToKeywords(inp);
+    int countKeywords = 0;
+    CreateTableRequest* c = convertCreateStringToRequest(keywords);
+    LinkedListNode<char*>* cols = c->columnNames;
+    LinkedListNode<char*>* dataTypes = c->dataTypes;
+
+    cout << "Table name: " << c->tableName << endl << endl;
+    cout << "Table attributes: " << endl;
+    while (cols) {
+        cout << cols->data << " : " << dataTypes->data << endl;
+        cols = cols->next;
+        dataTypes = dataTypes->next;
+    }
+    cout << endl;
+    cout << "Primary Key: " << c->primaryIndexColumn << endl;
     return 0;
 }
