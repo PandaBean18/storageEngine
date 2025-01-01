@@ -13,6 +13,11 @@
 #define DELIMITER ";"
 #define BRACKET_OPEN "("
 #define BRACKET_CLOSE ")"
+#define TABLE_NAME "table_name"
+#define ATTRIBUTE_NAME "attribute_name"
+#define TYPE_INT "int"
+#define TYPE_CHAR "char"
+#define PRIMARY_KEY "primary_key"
 
 using namespace std;
 
@@ -30,6 +35,11 @@ struct VARCHAR {
     char* val;
 };
 
+struct Attribute {
+    char* attrName;
+    char* attrDatatype;
+};
+
 struct Table {
     char* name;
     int rowSize;
@@ -38,6 +48,15 @@ struct Table {
 struct Keyword {
     char* type;
     char* val = NULL; // only for string literals
+    char* datatype = NULL; // only for attributes
+    int isPrimary = 0; // only for attributes
+};
+
+struct CreateTableRequest {
+    char* tableName;
+    char* columnNames;
+    char* dataTypes;
+    char* primaryIndexColumn;
 };
 
 class QueryParseError : public exception 
@@ -58,6 +77,13 @@ class UndefinedKeywordError : public exception
     }
 };
 
+class SyntaxError : public exception {
+    public:
+    const char* what() const noexcept override {
+        return "There was a syntax error in your SQL query.\n";
+    }
+};
+
 char* findCurrentKeyword(char* word) {
     if ((strcmp(word, "SELECT") == 0) || (strcmp(word, "select") == 0)) {
         return SELECT;
@@ -69,30 +95,107 @@ char* findCurrentKeyword(char* word) {
         return TABLE;
     } else if ((strcmp(word, "WHERE") == 0) || (strcmp(word, "where") == 0)) {
         return WHERE;
+    } else if ((strcmp(word, "INT") == 0) || (strcmp(word, "int") == 0)) {
+        return TYPE_INT;
+    } else if ((strcmp(word, "CHAR") == 0) || (strcmp(word, "char") == 0)) {
+        return TYPE_CHAR;
+    } else if ((strcmp(word, "PRIMARY_KEY") == 0) || (strcmp(word, "primary_key") == 0)) {
+        return PRIMARY_KEY;
     } else {
-        cout << word << endl;
-        throw UndefinedKeywordError();
+        //cout << word << endl;
+        return NULL;
     }
 }
 
-LinkedListNode<char*>* convertStringToKeywords(char* string) {
-    LinkedListNode<char*>* start = NULL;
-    LinkedListNode<char*>* end = start;
+char* parseAttribute(char* string, Keyword* keyword) {
+    while(*string != ',' && *string != ')') {
+        char* currentWord = NULL;
+        int currentWordLength = 0;
+        while (*string != ' ') {
+            if (*string == ',' || *string == ')') {
+                char* temp = (char*)realloc(currentWord, currentWordLength+1);
+                currentWord = temp;
+                currentWord[currentWordLength] = '\0';
+                char* currentKeyword = findCurrentKeyword(currentWord);
+
+                if (currentKeyword != PRIMARY_KEY && currentKeyword != TYPE_CHAR && currentKeyword != TYPE_INT) {
+                    throw SyntaxError();
+                }
+
+                if (currentKeyword == TYPE_CHAR || currentKeyword == TYPE_INT) {
+                    if (keyword->datatype != NULL) {
+                        throw SyntaxError();
+                    }
+
+                    keyword->datatype = currentKeyword;
+                } else if (currentKeyword == PRIMARY_KEY) {
+                    keyword->isPrimary = 1;
+                }
+                return string;
+            } else {
+                char* temp = (char*)realloc(currentWord, currentWordLength+1);
+                currentWord = temp;
+                currentWord[currentWordLength] = *string;
+                currentWordLength++;
+            }
+            string++;
+        }
+
+        if (currentWord == NULL) {
+            string++;
+            continue;
+        }
+
+        char* temp = (char*)realloc(currentWord, currentWordLength+1);
+        currentWord = temp;
+        currentWord[currentWordLength] = '\0';
+        char* currentKeyword = findCurrentKeyword(currentWord);
+
+        if (currentKeyword != PRIMARY_KEY && currentKeyword != TYPE_CHAR && currentKeyword != TYPE_INT) {
+            throw SyntaxError();
+        }
+
+        if (currentKeyword == TYPE_CHAR || currentKeyword == TYPE_INT) {
+            if (keyword->datatype != NULL) {
+                throw SyntaxError();
+            }
+
+            keyword->datatype = currentKeyword;
+        } else if (currentKeyword == PRIMARY_KEY) {
+            keyword->isPrimary = 1;
+        }
+        currentWord = NULL;
+        currentWordLength = 0;
+        string++;
+    }
+    return string;
+}
+
+CreateTableRequest* convertCreateStringToRequest(char* string) {
+
+}
+
+LinkedListNode<Keyword*>* convertStringToKeywords(char* string) {
+    LinkedListNode<Keyword*>* start = NULL;
+    LinkedListNode<Keyword*>* end = start;
 
     char* currentWord = NULL;
     int currentWordSize = 0;
     int isStringLiteral = 0;
+    int ignoreUndefinedKeywords = 0;
 
     while(*string != '\0') {
-
         if (isStringLiteral) {
             if (*string == '\'') {
                 isStringLiteral = 0;
                 char* temp = (char*)realloc(currentWord, currentWordSize+1);
                 currentWord = temp;
                 currentWord[currentWordSize] = '\0';
-                LinkedListNode<char*>* t = new LinkedListNode<char*>;
-                t->data = currentWord;
+                Keyword* strLiteral = new Keyword;
+                strLiteral->type = STR_LITERAL;
+                strLiteral->val = currentWord;
+                LinkedListNode<Keyword*>* t = new LinkedListNode<Keyword*>;
+                t->data = strLiteral;
                 t->next = NULL;
 
                 if (end) {
@@ -116,11 +219,34 @@ LinkedListNode<char*>* convertStringToKeywords(char* string) {
             string++;
             continue;
         } else if (*string == ' ') {
-            LinkedListNode<char*>* t = new LinkedListNode<char*>;
+            Keyword* keyword = new Keyword;
+            LinkedListNode<Keyword*>* t = new LinkedListNode<Keyword*>;
             char* temp = (char*)realloc(currentWord, currentWordSize+1);
             currentWord = temp;
             currentWord[currentWordSize] = '\0';
-            t->data = findCurrentKeyword(currentWord);
+            keyword->type = findCurrentKeyword(currentWord);
+
+            if (keyword->type == NULL) {
+                if (ignoreUndefinedKeywords == 0 && end->data->type != TABLE) {
+                    throw UndefinedKeywordError();
+                } else if (end->data->type == TABLE) {
+                    if (start->data->type == CREATE) {
+                        keyword->type = TABLE_NAME;
+                        keyword->val = currentWord;
+                    }
+                } else if (ignoreUndefinedKeywords && start->data->type == CREATE) {
+                    keyword->type = ATTRIBUTE_NAME;
+                    keyword->val = currentWord;
+                    string = parseAttribute(string, keyword);
+                    if (*string == ')') {
+                        string--;
+                    } 
+                }
+            } else {
+                keyword->val = NULL;
+            }
+
+            t->data = keyword;
             t->next = NULL;
             
             if (end) {
@@ -132,6 +258,51 @@ LinkedListNode<char*>* convertStringToKeywords(char* string) {
 
             currentWordSize = 0;
             currentWord = NULL;
+        } else if (*string == '(') {
+            ignoreUndefinedKeywords = 1;
+        } else if (*string == ')') {
+            if (ignoreUndefinedKeywords == 0) {
+                throw SyntaxError();
+            } else {
+                if (currentWord != NULL) {
+                    Keyword* keyword = new Keyword;
+                    LinkedListNode<Keyword*>* t = new LinkedListNode<Keyword*>;
+                    char* temp = (char*)realloc(currentWord, currentWordSize+1);
+                    currentWord = temp;
+                    currentWord[currentWordSize] = '\0';
+                    keyword->type = findCurrentKeyword(currentWord);
+
+                    if (keyword->type == NULL) {
+                        if (ignoreUndefinedKeywords == 0 && end->data->type != TABLE) {
+                            throw UndefinedKeywordError();
+                        } else if (end->data->type == TABLE) {
+                            if (start->data->type == CREATE) {
+                                keyword->type = TABLE_NAME;
+                                keyword->val = currentWord;
+                            }
+                        } else if (ignoreUndefinedKeywords && start->data->type == CREATE) {
+                            keyword->type = ATTRIBUTE_NAME;
+                            keyword->val = currentWord;
+                        }
+                    } else {
+                        keyword->val = NULL;
+                    }
+
+                    t->data = keyword;
+                    t->next = NULL;
+                    
+                    if (end) {
+                        end->next = t;
+                        end = end->next;
+                    } else {
+                        start = end = t;
+                    }
+
+                    currentWordSize = 0;
+                    currentWord = NULL;
+                }
+                ignoreUndefinedKeywords = 0;
+            }
         } else {
             char* temp = (char*)realloc(currentWord, currentWordSize+1);
             currentWord = temp;
@@ -143,9 +314,13 @@ LinkedListNode<char*>* convertStringToKeywords(char* string) {
     return start;
 }
 
-// Table* createTable(char* query) {
+Table* createTable(char* query) {
+    LinkedListNode<Keyword*>* parsedKeywords = convertStringToKeywords(query);
 
-// }
+    if (parsedKeywords->data->type != CREATE) {
+        throw QueryParseError();
+    } 
+}
 
 int main() {
     // BTreeNode* root = new BTreeNode;
@@ -172,10 +347,22 @@ int main() {
     //     cout << "Number of children of root: " << root->countChildren << endl;
     // }
 
-    LinkedListNode<char*>* keywords = convertStringToKeywords("SELECT CREATE FROM  select    create   'hello this is a string literal'\0");
+    LinkedListNode<Keyword*>* keywords = convertStringToKeywords("CREATE TABLE users (userID INT PRIMARY_KEY, userName CHAR)\0");
     int countKeywords = 0;
+
+    cout << "Input: " << "CREATE TABLE users (userID INT PRIMARY_KEY, userName CHAR)\0" << endl;
     while (keywords) {
-        cout << keywords->data << endl;
+        cout << endl << keywords->data->type;
+        if (keywords->data->type == STR_LITERAL || keywords->data->type == ATTRIBUTE_NAME || keywords->data->type == TABLE_NAME) {
+            cout << "\nValue: " << keywords->data->val << endl;
+
+            if (keywords->data->type == ATTRIBUTE_NAME) {
+                cout << "Datatype: " << keywords->data->datatype << endl;
+                cout << "Is Primary: " << keywords->data->isPrimary << endl; 
+            }
+
+            cout << endl << endl;
+        }
         keywords = keywords->next;
         countKeywords++;
     }
