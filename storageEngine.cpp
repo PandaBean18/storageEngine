@@ -1,12 +1,16 @@
 #include "btree.cpp"
-#include "stack"
 #include <cstring>
 #include <string>
+#include <fstream>
+#include <filesystem>
 
 // Defination of keywords;
 
 #define SELECT "select"
+#define INSERT "insert"
+#define INTO "into"
 #define FROM "from"
+#define VALUES "values"
 #define STR_LITERAL "string_literal"
 #define CREATE "create"
 #define TABLE "table"
@@ -19,8 +23,10 @@
 #define TYPE_INT "int"
 #define TYPE_CHAR "char"
 #define PRIMARY_KEY "primary_key"
+#define INSERT_VALUE "insert_value"
 
 using namespace std;
+using namespace std::filesystem;
 
 struct INT {
     int val;
@@ -102,8 +108,13 @@ char* findCurrentKeyword(char* word) {
         return TYPE_CHAR;
     } else if ((strcmp(word, "PRIMARY_KEY") == 0) || (strcmp(word, "primary_key") == 0)) {
         return PRIMARY_KEY;
+    } else if ((strcmp(word, "VALUES") == 0) || (strcmp(word, "values") == 0)) {
+        return VALUES;
+    } else if ((strcmp(word, "INSERT") == 0) || (strcmp(word, "insert") == 0)) {
+        return INSERT;
+    } else if ((strcmp(word, "INTO") == 0) || (strcmp(word, "into") == 0)){
+        return INTO;
     } else {
-        //cout << word << endl;
         return NULL;
     }
 }
@@ -289,10 +300,15 @@ LinkedListNode<Keyword*>* convertStringToKeywords(char* string) {
             keyword->type = findCurrentKeyword(currentWord);
 
             if (keyword->type == NULL) {
-                if (ignoreUndefinedKeywords == 0 && end->data->type != TABLE) {
+                if (ignoreUndefinedKeywords == 0 && (end->data->type != TABLE && end->data->type != INTO)) {
                     throw UndefinedKeywordError();
-                } else if (end->data->type == TABLE) {
-                    if (start->data->type == CREATE) {
+                } else if (end->data->datatype == INTO) {
+                    if (start->data->type == INSERT) {
+                        keyword->type = TABLE_NAME;
+                        keyword->val = currentWord;
+                    }
+                } else if (end->data->type == TABLE || end->data->type == INTO) {
+                    if (start->data->type == CREATE || start->data->type == INSERT) {
                         keyword->type = TABLE_NAME;
                         keyword->val = currentWord;
                     }
@@ -321,7 +337,31 @@ LinkedListNode<Keyword*>* convertStringToKeywords(char* string) {
             currentWordSize = 0;
             currentWord = NULL;
         } else if (*string == '(') {
-            ignoreUndefinedKeywords = 1;
+            if (start->data->type == CREATE) {
+                ignoreUndefinedKeywords = 1;
+            } else if (end->data->type == VALUES) {
+                Keyword* k = new Keyword;
+                k->type = INSERT_VALUE;
+                string++;
+                char* val = NULL;
+                int len = 0;
+                while (*string != ')') {
+                    val = (char*)realloc(val, len+1);
+                    val[len] = *string;
+                    len++;
+                    string++;
+                }
+                val = (char*)realloc(val, len+1);
+                val[len] = '\0';
+
+                k->val = val;
+
+                end->next = new LinkedListNode<Keyword*>;
+                end = end->next;
+                end->data = k;
+                end->next = NULL;
+
+            }
         } else if (*string == ')') {
             if (ignoreUndefinedKeywords == 0) {
                 throw SyntaxError();
@@ -376,12 +416,66 @@ LinkedListNode<Keyword*>* convertStringToKeywords(char* string) {
     return start;
 }
 
-Table* createTable(char* query) {
-    LinkedListNode<Keyword*>* parsedKeywords = convertStringToKeywords(query);
+void createTable(CreateTableRequest* req) {
+    // first line: Column names with their data types
+    // second: primary key index column
+    char* path = (char*)malloc(sizeof(char)*5);
+    path[0] = '.';
+    path[1] = '/';
+    path[2] = 'd';
+    path[3] = 'b';
+    path[4] = '/';
+    int len = 5;
+    
+    for (char* c = req->tableName; *c != '\0'; c++) {
+        path = (char*)realloc(path, len+1);
+        path[len] = *c;
+        len++;
+    }
+    
+    path = (char*)realloc(path, len+1);
+    path[len] = '\0';
 
-    if (parsedKeywords->data->type != CREATE) {
-        throw QueryParseError();
-    } 
+    create_directory("db");
+
+    ofstream writeFile = ofstream(path, ios_base::out);
+
+    LinkedListNode<char*>* columnNames = req->columnNames;
+    LinkedListNode<char*>* columnDataTypes = req->dataTypes;
+
+    while (columnNames) {
+        char* name = columnNames->data;
+
+        while (*name != '\0') {
+            writeFile.write(name, 1);
+            name++;
+        }
+
+        writeFile.write(":", 1);
+
+        char* dataType = columnDataTypes->data;
+
+        while (*dataType != '\0') {
+            writeFile.write(dataType, 1);
+            dataType++;
+        }
+        writeFile.write(" ", 1);
+        columnDataTypes = columnDataTypes->next;
+        columnNames = columnNames->next;
+    }
+
+    writeFile.write("\n", 1);
+
+    char* primary = req->primaryIndexColumn;
+
+    while (*primary != '\0') {
+        writeFile.write(primary, 1);
+        primary++;
+    }
+
+    writeFile.write("\n", 1);
+
+    writeFile.close();
 }
 
 int main() {
@@ -402,19 +496,16 @@ int main() {
     inp[count] = '\0';
 
     LinkedListNode<Keyword*>* keywords = convertStringToKeywords(inp);
-    int countKeywords = 0;
-    CreateTableRequest* c = convertCreateStringToRequest(keywords);
-    LinkedListNode<char*>* cols = c->columnNames;
-    LinkedListNode<char*>* dataTypes = c->dataTypes;
+    // CreateTableRequest* c = convertCreateStringToRequest(keywords);
+    // LinkedListNode<char*>* cols = c->columnNames;
+    // LinkedListNode<char*>* dataTypes = c->dataTypes;
 
-    cout << "Table name: " << c->tableName << endl << endl;
-    cout << "Table attributes: " << endl;
-    while (cols) {
-        cout << cols->data << " : " << dataTypes->data << endl;
-        cols = cols->next;
-        dataTypes = dataTypes->next;
+    //createTable(c);
+
+    while (keywords) {
+        cout << keywords->data->type << endl;
+        keywords = keywords->next;
     }
-    cout << endl;
-    cout << "Primary Key: " << c->primaryIndexColumn << endl;
+
     return 0;
 }
