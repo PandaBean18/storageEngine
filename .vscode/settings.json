@@ -4,6 +4,7 @@
         "ostream": "cpp",
         "xutility": "cpp",
         "stack": "cpp",
-        "limits": "cpp"
+        "limits": "cpp",
+        "algorithm": "cpp"
     }
 }

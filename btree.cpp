@@ -26,6 +26,7 @@ typedef struct BTreeNode {
     int countKeys;
     int countChildren;
     LinkedListNode<int>* keys;
+    LinkedListNode<int>* lineNumbers;
     LinkedListNode<BTreeNode*>* children;
 } BTreeNode;
 
@@ -331,50 +332,45 @@ BTreeNode* insert(BTreeNode* node, int val) {
 }
 
 void printTree(BTreeNode* root) {
+    int count = 1;
+    int mult = 0;
     LinkedListNode<BTreeNode*>* toBeTraversed = new LinkedListNode<BTreeNode*>;
     toBeTraversed->data = root;
-    LinkedListNode<BTreeNode*>* last = new LinkedListNode<BTreeNode*>;
-    last->data = nullptr;
-    toBeTraversed->next = last;
-    
-    while(toBeTraversed != last) {
-        if (toBeTraversed->data == nullptr) {
+    toBeTraversed->next = NULL;
+    LinkedListNode<BTreeNode*>* last = toBeTraversed;
+
+    while (toBeTraversed != NULL) {
+        LinkedListNode<int>* values = toBeTraversed->data->keys;
+        LinkedListNode<BTreeNode*>* children = toBeTraversed->data->children;
+
+        while (values) {
+            cout << values->data;
+
+            cout << " ";
+            values = values->next;
+            
+        }
+
+        while (children) {
+            last->next = new LinkedListNode<BTreeNode*>;
+            last->next->data = children->data;
+            last = last->next;
+            last->next = NULL;
+
+            children = children->next;
+            mult++;
+        }
+
+        count--;
+
+        if (count == 0) {
+            count = mult;
+            mult = 0;
             cout << endl;
-        } else {
-            LinkedListNode<int>* current = toBeTraversed->data->keys;
-            
-            while (current != NULL) {
-                cout << current->data << " ";
-                current = current->next;
-            }
-
-            LinkedListNode<BTreeNode*>* children = toBeTraversed->data->children;
-            
-            if (children != NULL) {
-                LinkedListNode<BTreeNode*>* currentChild = children;
-                while (children != NULL && children->data != NULL) {
-                    //cout << children->data << endl;
-                    last->next = new LinkedListNode<BTreeNode*>;
-                    last->next->data = children->data;
-                    last = last->next;
-                    children = children->next;
-                }
-
-                last->next = new LinkedListNode<BTreeNode*>;
-                last->next->data = nullptr;
-                last = last->next;
-            }
         }
         toBeTraversed = toBeTraversed->next;
     }
 
-    if (toBeTraversed != NULL && toBeTraversed->data != nullptr) {
-        LinkedListNode<int>* current = toBeTraversed->data->keys;
-        while (current != NULL) {
-            cout << current->data << " ";
-            current = current->next;
-        }
-    }
 }
 
 // void printChildren(BTreeNode* node) {
@@ -402,47 +398,47 @@ void printTree(BTreeNode* root) {
 //     cout << endl;
 // }
 
-// int main() {
-//     BTreeNode* root = new BTreeNode;
-//     root->keys = new LinkedListNode<int>;
-//     root->keys->data = 2;
-//     root->keys->next = NULL;
-//     root->children = NULL;
-//     root->countChildren = 0;
-//     root->countKeys = 1;
-//     root->isLeaf = 1;
-//     root->order = 4;
-//     int a;
-//     while (1) {
-//         cout<< endl << "> ";
-//         cin >> a;
+int main() {
+    BTreeNode* root = new BTreeNode;
+    root->keys = new LinkedListNode<int>;
+    root->keys->data = 2;
+    root->keys->next = NULL;
+    root->children = NULL;
+    root->countChildren = 0;
+    root->countKeys = 1;
+    root->isLeaf = 1;
+    root->order = 3;
+    // int a;
+    // while (1) {
+    //     cout<< endl << "> ";
+    //     cin >> a;
 
-//         if (a == -1) {
-//             break;
-//         }
+    //     if (a == -1) {
+    //         break;
+    //     }
 
-//         root = insert(root, a);
-//         printTree(root);
-//         cout << endl;
-//         cout << "Number of children of root: " << root->countChildren << endl;
-//     }
+    //     root = insert(root, a);
+    //     printTree(root);
+    //     cout << endl;
+    //     cout << "Number of children of root: " << root->countChildren << endl;
+    // }
 
-//     return 0;
-
-
-//     root = insert(root, 0);
-//     root = insert(root, 1);
-//     root = insert(root, 3);
-//     root = insert(root, 4);
-//     root = insert(root, 5);
-//     root = insert(root, 6);
-//     root = insert(root, 7);
-//     root = insert(root, 8);
-//     root = insert(root, 9);
-//     root = insert(root, 10);
-//     printTree(root);
-//     cout << endl;
+    // return 0;
 
 
-//     return 0;
-// }
+    root = insert(root, 0);
+    root = insert(root, 1);
+    root = insert(root, 3);
+    root = insert(root, 4);
+    root = insert(root, 5);
+    root = insert(root, 6);
+    root = insert(root, 7);
+    root = insert(root, 8);
+    root = insert(root, 9);
+    root = insert(root, 10);
+    printTree(root);
+    cout << endl;
+
+
+    return 0;
+}
