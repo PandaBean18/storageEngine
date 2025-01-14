@@ -5,6 +5,8 @@ using namespace std;
 template<typename t>
 struct LinkedListNode{
     t data; 
+    int offset; // while writing majority of the code for the btree i forgot to add functionality to store byte offset for finding 
+                // the actual row, so this value is there ONLY for BTreeNode to store file offset.
     LinkedListNode* next;   
 };
 
@@ -26,7 +28,6 @@ typedef struct BTreeNode {
     int countKeys;
     int countChildren;
     LinkedListNode<int>* keys;
-    LinkedListNode<int>* lineNumbers;
     LinkedListNode<BTreeNode*>* children;
 } BTreeNode;
 
@@ -321,14 +322,44 @@ BTreeNode* insert(BTreeNode* node, int val) {
                     path = path->next;
                 }
             }
-            
-            
+               
             cont = (c->countKeys >= c->order);
         }
-
         return node;
-
     }    
+}
+
+BTreeNode* search(BTreeNode* root, int val) {
+    LinkedListNode<int>* keys = root->keys;
+    LinkedListNode<BTreeNode*>* children = root->children;
+
+    while (1) {
+        if (root->isLeaf == 0) {
+            if (keys->data == val) {
+                return root;
+            } else if (keys->data > val) {
+                root = children->data;
+                keys = root->keys;
+                children = root->children;
+            } else if (val > keys->data && keys->next == NULL) {
+                root = children->next->data;
+                keys = root->keys;
+                children = root->children;
+            } else {
+                keys = keys->next;
+                children = children->next;
+            }
+        } else {
+            while (keys) {
+                if (keys->data == val) {
+                    return root;
+                }
+                keys = keys->next;
+            }
+            return NULL;
+        }
+    }
+
 }
 
 void printTree(BTreeNode* root) {
@@ -373,31 +404,6 @@ void printTree(BTreeNode* root) {
 
 }
 
-// void printChildren(BTreeNode* node) {
-//     LinkedListNode<BTreeNode*>* current = node->children;
-
-//     while (current != NULL) {
-//         LinkedListNode<int>* c = current->data->keys;
-
-//         while (c != NULL) {
-//             cout << c->data << " ";
-//             c = c->next;
-//         }
-//         cout << "   ";
-//         current = current->next;
-//     }
-// }
-
-// void printKeys(BTreeNode* node) {
-//     LinkedListNode<int>* current = node->keys;
-
-//     while (current != NULL) {
-//         cout << current->data;
-//         current = current->next;
-//     }
-//     cout << endl;
-// }
-
 int main() {
     BTreeNode* root = new BTreeNode;
     root->keys = new LinkedListNode<int>;
@@ -439,6 +445,6 @@ int main() {
     printTree(root);
     cout << endl;
 
-
+    delete root;
     return 0;
 }
